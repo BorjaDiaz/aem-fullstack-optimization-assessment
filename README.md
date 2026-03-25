@@ -71,26 +71,27 @@ Notes:
 - The repository does not include an opinionated local Dispatcher container setup. Treat the `dispatcher` module as configuration source for review and refactoring.
 
 ## 7. Required Tasks
-- Backend: Refactor the service to use a pooled `HttpClient` and implement Caffeine or Guava caching.
-- Architecture: Implement Context-Aware Configuration (CAConfig) for API keys.
-- Frontend: Remove inline JavaScript and business logic from HTL. Use a Sling Model or equivalent server-side pattern to provide data safely.
-- Dispatcher: Harden `filters.any` to block sensitive paths such as `/bin` and `/system`, and allow only the selectors and endpoints that are actually required.
-- Unit Testing: Provide at least one JUnit test using `AemContext` that validates your refactored logic.
+- Backend: Refactor the backend integration to improve security, resilience, performance, and maintainability.
+- Architecture: Replace the current configuration approach with a tenant-aware solution suitable for enterprise AEM.
+- Frontend: Remove inline JavaScript and business logic from HTL. Use a server-side pattern to provide data safely.
+- Dispatcher: Harden `filters.any` so only the required paths, selectors, and endpoints are allowed.
+- Testing: Add automated tests that validate the refactored behavior.
 
 ## 8. Constraints
 - Do not submit only a written review. Implement the refactor.
 - Do not remove the component entirely or replace the exercise with a different feature.
 - Do not add the solution directly to this README.
-- The current `core` module intentionally does not include `HttpClient` or `Caffeine` dependencies. Add and manage those dependencies yourself as part of the refactor.
+- Add and manage any dependencies required by your solution as part of the refactor.
 
 ## 9. Submission
-Provide a Pull Request with your changes.
+Do not submit a public Pull Request.
 
 Include:
 
 - your code changes
 - a `DECISIONS.md` file explaining key architectural choices such as caching strategy, configuration strategy, and Dispatcher hardening decisions
 - any assumptions needed to run or evaluate your solution
+- a private fork or private repository link shared by email
 
 ## 10. Evaluation Criteria
 Your submission will be evaluated on:
