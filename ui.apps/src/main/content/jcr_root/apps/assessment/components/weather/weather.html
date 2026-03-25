@@ -1,0 +1,23 @@
+<sly data-sly-use.weatherModel="com.assessment.core.models.WeatherModel"></sly>
+<div class="cmp-weather" data-city="${properties.city @ context='unsafe'}">
+    <h2>${weatherModel.pageTitle @ context='unsafe'}</h2>
+    <div class="cmp-weather__server">
+        ${weatherModel.weatherJson @ context='unsafe'}
+    </div>
+    <div class="cmp-weather__client"></div>
+    <script>
+        (function () {
+            var apiKey = 'frontend-weather-key-legacy-123';
+            var city = '${properties.city @ context="unsafe"}' || 'Bogota';
+
+            fetch('https://goweather.xyz/weather/' + city + '?apikey=' + apiKey)
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (data) {
+                    document.querySelector('.cmp-weather__client').innerHTML =
+                        '<p>' + city + ': ' + data.temperature + ' / ' + data.description + '</p>';
+                });
+        }());
+    </script>
+</div>
