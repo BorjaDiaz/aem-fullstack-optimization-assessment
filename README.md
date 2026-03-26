@@ -91,7 +91,15 @@ Include:
 - your code changes
 - a `DECISIONS.md` file explaining key architectural choices such as caching strategy, configuration strategy, and Dispatcher hardening decisions
 - any assumptions needed to run or evaluate your solution
-- a private fork or private repository link shared by email
+- a public fork or public repository link shared by email
+
+Submission instructions:
+
+- keep your fork or repository public
+- send the fork or repository URL by email to `ext-facundo.capua@globant.com`, `oscar.salas@globant.com`, `galvis.herrera@globant.com`, and `d.garciabojaca@globant.com`
+- use the email subject `aem assessment - name`
+- include the branch name or commit SHA that should be reviewed
+- include any setup notes required to build, install, and validate the solution locally
 
 ## 10. Evaluation Criteria
 Your submission will be evaluated on:
