@@ -1,0 +1,21 @@
+<VirtualHost *:80>
+    ServerName assessment.local
+    DocumentRoot /var/www/html
+
+    <IfModule disp_apache2.c>
+        DispatcherConfig conf.dispatcher.d/dispatcher.any
+        DispatcherUseProcessedURL 1
+        DispatcherPassError 0
+    </IfModule>
+
+    <Directory />
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    <Location />
+        <IfModule disp_apache2.c>
+            SetHandler dispatcher-handler
+        </IfModule>
+    </Location>
+</VirtualHost>
