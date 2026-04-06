@@ -17,11 +17,11 @@ import org.slf4j.LoggerFactory;
 @Component(service = WeatherService.class, immediate = true)
 public class WeatherServiceImpl implements WeatherService {
 
-    private final Map<String, String> cache = new HashMap<>();
+    private final Map<String, String> cache = new ConcurrentHashMap<>();
     private static final Logger LOG = LoggerFactory.getLogger(WeatherServiceImpl.class);
 
     @Override
-    public String getForecast(String city, Resource resource) throws Exception {
+    public String getForecast(String city, Resource resource) {
         if (resource == null){
             return null;
         }

@@ -38,7 +38,7 @@ public class WeatherModel {
 
 
     @PostConstruct
-    protected void init() throws Exception {
+    protected void init() {
         String requestedCity = getCity();
         try{
             String jsonResponse = weatherService.getForecast(requestedCity, currentResource);
