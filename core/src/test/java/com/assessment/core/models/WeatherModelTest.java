@@ -35,7 +35,6 @@ class WeatherModelTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Simulamos la ciudad inyectada para el test
         Field cityField = WeatherModel.class.getDeclaredField("city");
         cityField.setAccessible(true);
         cityField.set(weatherModel, "Madrid");
@@ -43,14 +42,11 @@ class WeatherModelTest {
 
     @Test
     void testInitSuccess() {
-        // Simulamos que el servicio devuelve un JSON válido
         String mockJsonResponse = "{\"temperature\":\"22°C\", \"description\":\"Sunny\"}";
         lenient().when(weatherService.getForecast(anyString(), any())).thenReturn(mockJsonResponse);
 
-        // Ejecutamos el método init()
         weatherModel.init();
 
-        // Comprobamos que el modelo parseó bien el JSON
         assertEquals("22°C", weatherModel.getTemperature());
         assertEquals("Sunny", weatherModel.getDescription());
         assertEquals("Madrid", weatherModel.getCity());
@@ -58,13 +54,10 @@ class WeatherModelTest {
 
     @Test
     void testInitWithEmptyResponse() {
-        // Simulamos que el servicio falla y devuelve null
         lenient().when(weatherService.getForecast(anyString(), any())).thenReturn(null);
 
-        // Ejecutamos el método init()
         weatherModel.init();
 
-        // Como el json es nulo, las variables no se rellenan y quedan como null en Java
         assertNull(weatherModel.getTemperature());
         assertNull(weatherModel.getDescription());
     }
