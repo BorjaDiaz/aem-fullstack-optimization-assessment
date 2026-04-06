@@ -26,17 +26,23 @@ public class WeatherModel {
     @Inject
     private WeatherService weatherService;
 
-    private String weatherJson;
+    private String temperature;
+    private String description;
+
 
     @PostConstruct
     protected void init() throws Exception {
-        String requestedCity = city != null ? city : "Bogota";
-        URL url = new URL(
-                "https://goweather.xyz/weather/"
-                        + URLEncoder.encode(requestedCity, StandardCharsets.UTF_8)
-                        + "?apikey=model-level-hardcoded-key");
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        weatherJson = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        String requestedCity = getCity();
+        try{
+            String jsonResponse = weatherService.getForecast(requestedCity, currentResource);
+            if (jsonResponse != null && !jsonResponse.isEmpty()) {
+                JsonObject jsonObject = JsonParser.parseString(jsonResponse).getAsJsonObject();
+                this.temperature = jsonObject.has("temperature") ? jsonObject.get("temperature").getAsString() : "N/A";
+                this.description = jsonObject.has("description") ? jsonObject.get("description").getAsString() : "N/A";
+            }
+        } catch (Exception e) {
+            LOG.error("Error {}", requestedCity, e);
+        }
     }
 
     public String getCity() {
