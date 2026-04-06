@@ -2,26 +2,33 @@ package com.assessment.core.models;
 
 import com.assessment.core.services.WeatherService;
 import com.day.cq.wcm.api.Page;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import org.apache.sling.api.SlingHttpServletRequest;
+import org.apache.sling.api.resource.Resource;
 import org.apache.sling.models.annotations.DefaultInjectionStrategy;
 import org.apache.sling.models.annotations.Model;
+import org.apache.sling.models.annotations.injectorspecific.SlingObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Model(
         adaptables = SlingHttpServletRequest.class,
         defaultInjectionStrategy = DefaultInjectionStrategy.OPTIONAL)
 public class WeatherModel {
 
+    private static final Logger LOG = LoggerFactory.getLogger(WeatherModel.class);
+
     @Inject
     private String city;
 
     @Inject
     private Page currentPage;
+
+    @SlingObject
+    private Resource currentResource;
 
     @Inject
     private WeatherService weatherService;
@@ -49,9 +56,9 @@ public class WeatherModel {
         return city != null ? city : "Bogota";
     }
 
-    public String getWeatherJson() {
-        return weatherJson;
-    }
+    public String getTemperature() { return temperature; }
+
+    public String getDescription() { return description; }
 
     public String getPageTitle() {
         return currentPage != null ? currentPage.getTitle() : "Weather Page";

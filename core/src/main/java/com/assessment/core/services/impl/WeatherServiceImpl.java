@@ -1,26 +1,55 @@
 package com.assessment.core.services.impl;
 
+import com.assessment.core.config.WeatherConfig;
 import com.assessment.core.services.WeatherService;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.sling.api.resource.Resource;
+import org.apache.sling.caconfig.ConfigurationBuilder;
 import org.osgi.service.component.annotations.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component(service = WeatherService.class, immediate = true)
 public class WeatherServiceImpl implements WeatherService {
 
-    private static final String API_KEY = "legacy-weather-api-key-12345";
-    private static final String ENDPOINT = "https://goweather.xyz/weather/%s?apikey=%s";
+    private final Map<String, String> cache = new HashMap<>();
+    private static final Logger LOG = LoggerFactory.getLogger(WeatherServiceImpl.class);
 
     @Override
-    public String getForecast(String city) throws Exception {
-        URL url = new URL(String.format(
-                ENDPOINT,
-                URLEncoder.encode(city, StandardCharsets.UTF_8),
-                API_KEY));
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        return new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    public String getForecast(String city, Resource resource) throws Exception {
+        if (resource == null){
+            return null;
+        }
+        WeatherConfig config = resource.adaptTo(ConfigurationBuilder.class).as(WeatherConfig.class);
+
+        if (cache.containsKey(city)) {
+            return cache.get(city);
+        }
+
+        try {
+            String urlString = String.format(config.endpoint(),
+                    URLEncoder.encode(city, StandardCharsets.UTF_8), config.apiKey());
+
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+
+            if (conn.getResponseCode() == 200) {
+                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                cache.put(city, response);
+                return response;
+            }
+        } catch (Exception e) {
+            LOG.error("Error {}", city, e);
+
+        }
+
+        return null;
     }
 }
