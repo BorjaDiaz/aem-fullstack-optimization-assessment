@@ -17,6 +17,11 @@
     <dependencies>
         <dependency>
             <groupId>com.assessment</groupId>
+            <artifactId>assessment.core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.assessment</groupId>
             <artifactId>assessment.ui.apps.structure</artifactId>
             <version>${project.version}</version>
             <type>zip</type>
@@ -52,7 +57,17 @@
                     <group>assessment</group>
                     <packageType>container</packageType>
                     <name>assessment.all</name>
+                    <version>${project.version}</version>
+
+                    <skipValidation>true</skipValidation>
+
                     <embeddeds>
+                        <embedded>
+                            <groupId>com.assessment</groupId>
+                            <artifactId>assessment.core</artifactId>
+                            <target>/apps/assessment-packages/application/install</target>
+                        </embedded>
+
                         <embedded>
                             <groupId>com.assessment</groupId>
                             <artifactId>assessment.ui.apps.structure</artifactId>
