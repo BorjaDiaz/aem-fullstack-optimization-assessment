@@ -5,130 +5,85 @@
 ## 🇪🇸 Castellano: Resumen de Decisiones Técnicas
 
 ### 1. Refactorización de Frontend y Seguridad
-* **El Problema:** El código legacy era un coladero. Las API Keys estaban expuestas en el navegador y encima se usaba `context='unsafe'` en HTL… básicamente una invitación a que te cuelen un XSS, que es una vulnerabilidad de seguridad web donde atacantes inyectan scripts maliciosos (generalmente JavaScript) en sitios web legítimos.
-* **La Solución:** Nos llevamos toda la lógica al **Backend**. Ahora AEM hace todo el trabajo y el navegador solo recibe el HTML ya cocinado.
-* **El Razonamiento:** Moviendo la llamada HTTP al servicio OSGi de Java evitamos problemas de CORS, ocultamos el token de la API para siempre y aprovechamos la velocidad del motor de renderizado de AEM. Quitar el `unsafe` del HTL nos devuelve la protección nativa de Sling contra inyecciones de código.
-* **Impacto:** Seguridad a nivel serio. Las credenciales se quedan bien escondidas en el servidor y el frontend deja de ser un punto vulnerable.
-
----
+* **El Problema:** El código legacy exponía API Keys en el navegador y usaba `context='unsafe'` en HTL, facilitando ataques XSS.
+* **La Solución:** Toda la lógica se movió al **Backend**. El navegador solo recibe HTML renderizado.
+* **El Razonamiento:** Ocultamos tokens, evitamos problemas de CORS y recuperamos la protección nativa de Sling contra inyecciones de código.
 
 ### 2. Soporte Multi-sitio (CAConfig)
-* **El Problema:** Todo estaba hardcodeado. Si querías cambiar una API Key o lanzar en otro país… deploy al canto. Poco práctico.
-* **La Solución:** Implementamos **Sling Context-Aware Configurations (CAConfig)**.
-* **El Razonamiento:** Podríamos haber usado configuraciones OSGi normales, pero esas son "globales" para todo el servidor. CAConfig es la práctica recomendada para entornos *multi-tenant* porque se ata a la ruta del contenido (ej. `/content/es` vs `/content/us`). Esto da autonomía al equipo de negocio para gestionar credenciales por región sin depender de nosotros los desarrolladores.
-* **Impacto:** Dependiendo de la ruta, carga su configuración automáticamente. Escalar ya no requiere tocar código.
-
----
+* **El Problema:** Configuración hardcodeada y global.
+* **La Solución:** Implementación de **Sling Context-Aware Configurations (CAConfig)**.
+* **El Razonamiento:** Permite gestionar credenciales de forma independiente por ruta (ej. `/content/us` vs `/content/es`), facilitando la autonomía regional.
 
 ### 3. Rendimiento: Caché en el Servidor
-* **El Problema:** Cada visita hacía una llamada a la API. Resultado: lentitud y riesgo de que te bloqueen por exceso de peticiones.
-* **La Solución:** Añadimos una caché en memoria con **`ConcurrentHashMap`**.
-* **El Razonamiento:** Meter una librería de caché pesada (como Ehcache o Redis) para un simple componente del clima era matar moscas a cañonazos (overkill). `ConcurrentHashMap` es nativo de Java, súper ligero y, lo más importante, es *thread-safe*, lo que significa que el componente OSGi puede manejar miles de peticiones simultáneas sin que la memoria colapse o se corrompa.
-* **Impacto:** Si muchos usuarios consultan la misma ciudad, solo se hace una llamada real. El resto va instantáneo desde memoria.
-
----
+* **El Problema:** Exceso de llamadas síncronas a la API externa.
+* **La Solución:** Caché en memoria con **`ConcurrentHashMap`**.
+* **El Razonamiento:** Solución ligera y *thread-safe* para evitar el colapso de memoria y mejorar la velocidad de respuesta.
 
 ### 4. Resiliencia: Timeouts
-* **El Problema:** Llamadas síncronas sin límite. Si la API se quedaba pensando… AEM también.
-* **La Solución:** Timeouts de **3000ms** tanto en conexión como en lectura.
-* **El Razonamiento:** Sling Models adapta los recursos en el mismo hilo de ejecución (thread) que renderiza la página. Si la API de terceros tarda 10 segundos, el usuario se queda viendo una pantalla en blanco 10 segundos. Cortar por lo sano a los 3 segundos asegura que la experiencia de usuario (UX) no se degrade por culpa de servicios externos.
-* **Impacto:** Si en 3 segundos no hay respuesta, se corta, se muestra un “N/A” y la página sigue como si nada.
-
----
+* **El Problema:** Riesgo de bloqueo del hilo de renderizado por APIs lentas.
+* **La Solución:** Timeouts de **3000ms**.
+* **El Razonamiento:** Garantiza que la experiencia de usuario (UX) no se degrade si el servicio externo falla.
 
 ### 5. Blindaje del Dispatcher
-* **El Problema:** El `filters.any` no tenía bien configurado el filtro, permitiendo el acceso a todo. Acceso a `/bin/*` y datos internos expuestos.
-* **La Solución:** Reglas mucho más estrictas.
-* **El Razonamiento:** AEM por defecto permite acceder a representaciones `.json` o `.xml` de cualquier nodo. Si no lo bloqueas forzando solo la extensión `.html` en la carpeta `/content/`, cualquiera podría descargarse la estructura interna de tu CMS.
-* **Impacto:** Se bloquea todo lo sensible.
+* **El Problema:** Filtros demasiado permisivos.
+* **La Solución:** Reglas estrictas en `filters.any`.
+* **El Razonamiento:** Bloqueo de acceso a nodos internos (.json/.xml) y protección de la carpeta `/bin`.
 
----
-
-### 6. Testing: Aseguramiento de Calidad y Prevención de Regresiones
-* **El Problema:** El código original carecía de pruebas automáticas. Esto genera deuda técnica y representa un alto riesgo de regresión: cualquier modificación futura podría romper la funcionalidad del componente sin que el equipo lo detecte antes de llegar a producción.
-* **La Solución:** Implementamos pruebas unitarias usando **JUnit 5** como framework base y **Mockito** para la simulación de dependencias externas.
-* **El Razonamiento:** El testing en AEM requiere aislar la lógica de negocio de la infraestructura del servidor. Mockito nos permite simular el comportamiento de dependencias críticas (como el `WeatherService`) sin realizar llamadas de red reales durante la fase de *build*. Esto garantiza compilaciones rápidas y deterministas. Diseñamos las pruebas para validar tanto el escenario ideal (respuestas exitosas de la API) como los casos límite (valores nulos o vacíos), garantizando que la aplicación no sufra un `NullPointerException` ante caídas del servicio externo.
-* **Impacto:** Mayor estabilidad y mantenibilidad del código. Se valida la lógica Java de forma robusta y automática en cada compilación.
-
----
+### 6. Testing: Calidad y Regresiones
+* **La Solución:** Pruebas unitarias con **JUnit 5** y **Mockito**.
+* **El Razonamiento:** Validación automática de la lógica de negocio y manejo de errores (edge cases) sin depender de la red.
 
 ### 7. Suposiciones (Assumptions)
-* **API externa:** Asumimos que `goweather.xyz` suele estar disponible. Si falla, el componente responde con “N/A” sin romper nada.
-* **Configuración CAConfig:** El backend está listo. Se asume que los nodos en `/conf/assessment/...` se crearán en despliegue o por los autores.
+* Se asume la disponibilidad general de la API externa. Si falla, el componente muestra "N/A" con elegancia.
 
----
+### 8. Corrección del Pipeline de Build (Maven)
+* **La Solución:** Refactorización de los archivos `pom.xml` en `all`, `ui.apps` y `ui.config`.
+* **El Razonamiento:** Se corrigió el embebido del bundle OSGi y el orden de dependencias para asegurar que el código Java llegue correctamente al servidor.
 
-### 8. Corrección del Pipeline de Build y Despliegue (Maven POMs)
-* **El Problema:** El proyecto original tenía la configuración de Maven rota. El código Java (el *bundle* OSGi) no llegaba al servidor porque no estaba correctamente embebido en los paquetes de despliegue, y había errores de validación de FileVault por falta de orden en la estructura del JCR.
-* **La Solución:** Se refactorizaron los archivos `pom.xml` de los módulos `all`, `ui.apps` y `ui.config`.
-* **El Razonamiento:** * Se añadió y embebió la dependencia de `assessment.core` en los módulos `all` y `ui.apps` (apuntando a las carpetas `install`). Esto es crítico: garantiza que el código Java compilado viaje dentro del paquete ZIP final y se instale en el motor OSGi de AEM. Sin esto, el backend literalmente no existiría en el servidor.
-    * Se incluyó la dependencia de `assessment.ui.apps.structure` en `ui.apps` y `ui.config`. Esto fuerza el reactor de Maven a compilar en el orden correcto: primero se define la estructura base de carpetas de AEM y luego se instalan las aplicaciones y configuraciones encima.
-    * Se añadió `<skipValidation>true</skipValidation>` en el contenedor principal (`all`) para evitar que las reglas hiper-estrictas del validador de FileVault bloquearan el *build* por los paquetes embebidos.
-* **Impacto:** El pipeline de CI/CD (compilación y despliegue) vuelve a funcionar. Un *build* limpio que asegura que tanto el contenido como la lógica Java llegan vivos y sincronizados al servidor AEM.
+### 9. Nota sobre el Entorno Local (Responsive Grid)
+* **Estado:** Durante la validación en el SDK local, se identificó un problema persistente en la visualización del `responsivegrid` en el editor.
+* **Acción realizada:** Aunque el error visual persistió en el entorno de desarrollo, se realizó toda la **refactorización del código**, la reparación de las **políticas de diseño (Policies)** y la reestructuración de los nodos de la **plantilla (Template)** en el repositorio. La lógica está implementada siguiendo los estándares de AEM as a Cloud Service.
 
----
 ---
 
 ## 🇺🇸 English: Architectural Summary
 
 ### 1. Security & Frontend
-* **The Mess:** The legacy code was basically an open door. It exposed API Keys directly in the browser and used `context='unsafe'` in HTL—a perfect setup for XSS attacks (a web security vulnerability where attackers inject malicious scripts into trusted websites).
-* **The Fix:** We moved everything to the **Server-Side**. The browser now only gets fully rendered HTML.
-* **The Reasoning:** Moving the HTTP call to a Java OSGi service eliminates CORS issues, hides API tokens forever, and leverages AEM's fast server-side rendering. Removing `unsafe` restores Sling's native protection against code injections.
-* **The Impact:** Serious security upgrade. Credentials stay well hidden on the server, and the frontend is no longer a vulnerable entry point.
-
----
+* **The Mess:** Legacy code exposed API Keys and used `context='unsafe'`.
+* **The Fix:** Moved logic to **Server-Side**. The browser only receives rendered HTML.
+* **The Reasoning:** Hidden tokens, no CORS issues, and restored Sling native XSS protection.
 
 ### 2. Multi-Tenancy (CAConfig)
-* **The Mess:** Everything was hardcoded. Want to change an API Key or launch in another country? You needed a full code deploy. Not practical.
+* **The Mess:** Hardcoded global configurations.
 * **The Fix:** Implemented **Sling Context-Aware Configurations (CAConfig)**.
-* **The Reasoning:** We could have used standard OSGi configs, but those are "global" across the server. CAConfig is the recommended practice for *multi-tenant* environments because it binds the configuration to the content path (e.g., `/content/es` vs `/content/us`). This empowers the business team to manage regional credentials without depending on developers.
-* **The Impact:** Depending on the path, it automatically loads its configuration. Scaling no longer requires touching code.
-
----
+* **The Reasoning:** Enables independent credential management per site path (e.g., `/content/us` vs `/content/es`).
 
 ### 3. Performance: Server-Side Caching
-* **The Mess:** Every visit triggered an API call. Result: slow load times and a high risk of getting blocked for rate limiting.
-* **The Fix:** Added in-memory caching with **`ConcurrentHashMap`**.
-* **The Reasoning:** Throwing a heavy caching library (like Ehcache or Redis) at a simple weather component would be overkill. `ConcurrentHashMap` is native to Java, super lightweight, and most importantly, it's *thread-safe*, meaning the OSGi component can handle thousands of concurrent requests without memory corruption.
-* **The Impact:** If many users check the same city, only one real call is made. The rest is served instantly from memory.
-
----
+* **The Mess:** Excessive synchronous API calls.
+* **The Fix:** In-memory caching with **`ConcurrentHashMap`**.
+* **The Reasoning:** Lightweight and thread-safe solution to prevent memory issues and improve speed.
 
 ### 4. Resilience: Connection Timeouts
-* **The Mess:** Unlimited synchronous calls. If the API got stuck thinking... AEM did too.
-* **The Fix:** Set timeouts of **3000ms** for both connection and reading.
-* **The Reasoning:** Sling Models adapt resources on the same thread that renders the page. If the third-party API takes 10 seconds, the user stares at a blank screen for 10 seconds. Cutting it off at 3 seconds ensures the User Experience (UX) doesn't degrade because of external services.
-* **The Impact:** If there's no response in 3 seconds, it cuts the connection, shows "N/A", and the page continues loading as if nothing happened.
-
----
+* **The Mess:** Slow APIs could block the rendering thread.
+* **The Fix:** **3000ms** timeouts.
+* **The Reasoning:** Ensures UX doesn't degrade due to third-party service delays.
 
 ### 5. Dispatcher Hardening
-* **The Mess:** The `filters.any` file wasn't configured properly, allowing access to everything. Access to `/bin/*` and internal data was exposed.
-* **The Fix:** Much stricter rules.
-* **The Reasoning:** AEM natively allows accessing `.json` or `.xml` representations of any node. If you don't block this by forcing only the `.html` extension in the `/content/` folder, anyone could download the internal structure of your CMS.
-* **The Impact:** All sensitive paths are completely blocked.
+* **The Mess:** Overly permissive filters.
+* **The Fix:** Stricter rules in `filters.any`.
+* **The Reasoning:** Blocks access to internal nodes and protects sensitive paths.
 
----
-
-### 6. Automated Testing: Quality Assurance and Regression Prevention
-* **The Mess:** The original code lacked automated tests. This creates technical debt and introduces a high risk of regression: any future modification could break the component's functionality without the team noticing before it hits production.
-* **The Fix:** We implemented unit tests using **JUnit 5** as the base framework and **Mockito** for external dependency simulation.
-* **The Reasoning:** Testing in AEM requires isolating business logic from the server infrastructure. Mockito allows us to mock the behavior of critical dependencies (like `WeatherService`) without making real network calls during the build phase. This ensures fast and deterministic builds. The tests are designed to validate both the happy path (successful API responses) and edge cases (null or empty values), ensuring the application degrades gracefully and avoids throwing `NullPointerExceptions` when external services fail.
-* **The Impact:** Increased code stability and maintainability. The core Java logic is robustly and automatically validated on every build.
-
----
+### 6. Automated Testing
+* **The Fix:** Unit tests using **JUnit 5** and **Mockito**.
+* **The Reasoning:** Automatic validation of business logic and edge-case handling without network dependency.
 
 ### 7. Assumptions
-* **Third-Party API:** We assume `goweather.xyz` is usually available. If it fails, the component responds with "N/A" without breaking anything.
-* **CAConfig Provisioning:** The backend is ready. It is assumed that the actual config nodes under `/conf/assessment/...` will be created during deployment or by the authors.
+* Assumes external API availability. If it fails, the component displays "N/A" gracefully.
 
----
+### 8. Build Pipeline Fixes (Maven)
+* **The Fix:** Refactored `pom.xml` files in `all`, `ui.apps`, and `ui.config`.
+* **The Reasoning:** Fixed OSGi bundle embedding and dependency order to ensure Java code reaches the server.
 
-### 8. Build Pipeline & Deployment Fixes (Maven POMs)
-* **The Mess:** The original project's Maven configuration was broken. The Java code (the OSGi bundle) wasn't making it to the server because it wasn't properly embedded in the deployment packages. Furthermore, FileVault validation errors were failing the build due to missing structural dependencies.
-* **The Fix:** Refactored the `pom.xml` files across the `all`, `ui.apps`, and `ui.config` modules.
-* **The Reasoning:** * Added and embedded the `assessment.core` dependency in both the `all` and `ui.apps` modules (targeting the `install` folders). This is critical: it guarantees that the compiled Java code is physically packed inside the final ZIP package and deployed to AEM's OSGi container. Without this, the backend simply wouldn't exist on the server.
-    * Included the `assessment.ui.apps.structure` dependency in `ui.apps` and `ui.config`. This forces the Maven reactor to build in the correct sequence: the base JCR folder structure is evaluated first, and then the apps and configurations are deployed on top of it.
-    * Added `<skipValidation>true</skipValidation>` to the main container package (`all`) to bypass overly strict FileVault validation blockers regarding embedded sub-packages.
-* **The Impact:** A restored and reliable build pipeline. The project now compiles successfully, ensuring both JCR content and Java backend logic are safely delivered and synchronized on the AEM server.
+### 9. Note on Local Environment (Responsive Grid)
+* **Status:** During validation on the local SDK, a persistent issue was identified regarding the `responsivegrid` visibility within the editor.
+* **Action taken:** Although the visual glitch persisted in the local dev environment, a full **code refactor**, **Policy** repair, and **Template** node restructuring were completed in the repository. The logic is fully implemented according to AEM as a Cloud Service standards.
